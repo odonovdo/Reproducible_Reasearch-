@@ -1,0 +1,44 @@
+---
+title: "StromEvents"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+
+
+
+```{r,  message=FALSE , warning=FALSE, echo=FALSE, cache=TRUE}
+
+
+# Download file
+if (!file.exists('FStormData.csv.bz2')){
+  url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+  download.file(url, destfile = paste0(getwd(),"/","FStormData.csv.bz2"))
+}
+
+## Read-in file 
+Stormdata <- read.csv("FStormData.csv.bz2" ,stringsAsFactors =  FALSE )
+
+
+StormTYPES <- matrix(c("Astronomical Low Tide","Avalanche","Blizzard","Coastal Flood","Cold/Wind Chill","Debris Flow","Dense Fog","Dense Smoke","Drought","Dust Devil","Dust Storm","Excessive Heat","Extreme Cold/Wind Chill","Flash Flood","Flood","Frost/Freeze","Funnel Cloud","Freezing Fog","Hail","Heat","Heavy Rain","Heavy Snow","High Surf","High Wind","Hurricane (Typhoon)","Ice Storm","Lake-Effect Snow","Lakeshore Flood","Lightning","Marine Hail","Marine High Wind","Marine Strong Wind","Marine Thunderstorm Wind","Rip Current","Seiche","Sleet ","Storm Surge/Tide","Strong Wind","Thunderstorm Wind","Tornado","Tropical Depression","Tropical Storm","Tsunami","Volcanic Ash","Waterspout","Wildfire","Winter Storm","Winter Weather"),ncol=4)
+colnames(StormTYPES) <- c("Event Type","Event Type","Event Type","Event Type")
+library(knitr)
+kable(StormTYPES,caption = "Documented Weather Events in Report")
+```
+  
+
+
+
+
+
+
+```{r,  message=FALSE , warning=FALSE, echo=FALSE}
+library(wordcloud);library(RColorBrewer)
+StomNum <- data.frame(table(Stormdata$EVTYPE))
+pal <- brewer.pal(11,"Paired")
+wordcloud(StomNum$Var1,StomNum$Freq,random.order=FALSE, rot.per=0.45, colors=brewer.pal(10, "Dark2"))
+
+
+```
+
