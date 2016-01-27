@@ -1,12 +1,10 @@
 ---
-title: "Project_2 Reproducable data"
-
-
+title: "NOAA_Storm"
+author: "Donnchadh"
 output: 
-html_document: 
-keep_md: yes
+  html_document: 
+    keep_md: yes
 ---
-
 
 # Title: Exploration of the NOAA Storm Database to investigate the impact of storm events on public health and economical damage.:  
 

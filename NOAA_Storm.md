@@ -1,0 +1,237 @@
+# NOAA_Storm
+Donnchadh  
+
+# Title: Exploration of the NOAA Storm Database to investigate the impact of storm events on public health and economical damage.:  
+
+## Introduction:
+
+This analyisis will investigate the following two questions:
+
+1. Across the United States, which types of storm events are most harmful with respect to the impact on population health in terms of:
+    a. FATALITIES that may result from storm events.
+    b. INJURIES that may result from storm events.  
+    
+2. Across the United States, which types of stomr events have the greatest economic consequences in terms of:
+    a. Cost to Property  that may result from storm events. 
+    b. Cost to Crops that may result from storm events.  
+
+
+The analsysis focuses on the actual strom event types that are presented in the stroms data-set [Here](http://rpubs.com/odonovdo/145149)
+
+
+## Synopsis:
+
+In terms of Harmfull events: Tornadoes storm events result in both the highest number of injuries and deaths with the greatest incident rates for both fatalities and injuries occuring between the hours of 16:00 and 18:00. A high incident rate is also observed during the early morning period.  This may be due to a large number of people going to and coming from work and therefore travelling in exposed areas during these times. 
+
+In terms of Economical damage: Tornadoes are the single storm event that has the greatest impact on property costs. However the impact on property costs from floods would be greatest if these (Flood and Flash Flood) storm events were combined. 
+Hail is the single storm event storm event that has the greatest impact on corps costs however the combination of Flood and Flash Flood storm events is a close second.
+
+
+## Data Processing 
+
+The Strom data for the analysis is located [here](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2), with the data loaded directly from the source link.  
+
+The analysis will answer question regarding which weather events cause injuries or Fatalities or Damage to property or crops.  
+  
+Weather events that do not have an impact on these features can be dropped from the data-set for consideration.  
+  
+Some of the features in the data set will be coded to reflect the type of data they represent eg dates/times.   
+
+
+
+```r
+# Download file
+if (!file.exists('FStormData.csv.bz2')){
+  url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+  download.file(url, destfile = paste0(getwd(),"/","FStormData.csv.bz2"))
+}
+
+## Read-in file 
+Stormdata <- read.csv("FStormData.csv.bz2" ,stringsAsFactors =  FALSE )
+
+## To Answer Question we are Intrested in events that have caused either fatalities or injury or economic consequences
+Stormdata <-  subset(Stormdata,INJURIES >= 1 | FATALITIES >= 1 | PROPDMG >= 1 | CROPDMG >= 1, select = - REMARKS)
+
+# Code date variables
+library(lubridate)
+Stormdata$BGN_DATE <- mdy_hms(Stormdata$BGN_DATE)
+Stormdata$END_DATE <- mdy_hms(Stormdata$END_DATE)
+
+# Code Time variables (begin time to see what time of day instances occur, End_TIME is complicated so not done due to time!)
+Stormdata[,c("BGN_TIME")] <-    sapply(Stormdata[,c("BGN_TIME")],
+                                       function(X){
+                                         ## Identfy the two different formats of times in variable
+                                         Y <- which(!grepl(":",X))
+                                         Z <- which( grepl(":",X))
+                                         ## Clean-up character represenation of times
+                                         X[X =="000"] <- "0000"
+                                         X[X =="9999"] <- "2400"
+                                         ## Formate times as proper formates
+                                         X[Y] <- as.character(strptime(X[Y], format = "%H%M"))
+                                         X[Z] <- as.character(strptime(X[Z], format = "%H:%M:%S"))
+                                         X
+                                       })
+
+Stormdata[,c("BGN_TIME")] <- hour(as.POSIXct( Stormdata[,c("BGN_TIME")] , format= "%Y-%m-%d %H:%M:%S"))        
+
+StomNum <- unique(Stormdata$EVTYPE)
+```
+
+  
+### Storm Events
+
+There are a large number of weather Events in the data set. A number of these weather events are represented by variables that have typos and contain variations in the terms used for the description provided. The analysis entailed cleansing these events and attempting to match these events against the official storm events categories.   
+
+The list of storm Events can be also found [here](http://rpubs.com/odonovdo/145149)
+  
+There are 174 strom events variables in the storm data-set.  
+
+* These 174 variables will be cleansed and matached against the 44 Event names in the official list of storm data events(section 2.1.1) of the [PDF Documnet](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) 
+
+* This will enable these variables to be aggregated so as to better represent the true impact of weather events on the features under investigation.  
+
+
+
+### Cleansing Storm EVENTS  
+
+The strategy for cleaning the Storm EVENT types is based on applying [fuzzy matching](https://stat.ethz.ch/R-manual/R-devel/library/utils/html/adist.html) to the majority of EVENT types that are do not have a direct match with those in the original EVENT type names and substituting them with a close match to these events.  
+
+
+
+```r
+# remove unnecessary white spaces and convert to upper case 
+Stormdata$EVTYPE <- trimws(toupper(as.character(Stormdata$EVTYPE)))
+
+# Remove double spaces
+Stormdata$EVTYPE <- gsub("  "," ",Stormdata$EVTYPE)
+
+# Code TSTM as THUNDERSTORM WIND
+Stormdata$EVTYPE[grepl("^(TSTM)",Stormdata$EVTYPE)]<- "THUNDERSTORM WIND"
+
+# Remove any "S"" at end of weather event (none appear in originla data)
+Stormdata$EVTYPE <- gsub("s$","",Stormdata$EVTYPE, ignore.case = TRUE)
+
+## Use fussy mataching to assign each weather event to its correct categorty
+
+# Get a list of Original EVENT data
+StormTYPES <- toupper(as.vector(c("Astronomical Low Tide","Avalanche","Blizzard","Coastal Flood","Cold/Wind Chill","Debris Flow","Dense Fog","Dense Smoke","Drought","Dust Devil","Dust Storm","Excessive Heat","Extreme Cold/Wind Chill","Flash Flood","Flood","Frost/Freeze","Funnel Cloud","Freezing Fog","Hail","Heat","Heavy Rain","Heavy Snow","High Surf","High Wind","Hurricane (Typhoon)","Ice Storm","Lake-Effect Snow","Lakeshore Flood","Lightning","Marine Hail","Marine High Wind","Marine Strong Wind","Marine Thunderstorm Wind","Rip Current","Seiche","Sleet ","Storm Surge/Tide","Strong Wind","Thunderstorm Wind","Tornado","Tropical Depression","Tropical Storm","Tsunami","Volcanic Ash","Waterspout","Wildfire","Winter Storm","Winter Weather")))
+
+#  Only Focus on storm event types (for cleansing) that are not present in original Event types
+Index <- Stormdata$EVTYPE %in% StormTYPES
+ 
+# Fuzzy Match
+Stormdata$EVTYPE[!Index] <- sapply(Stormdata$EVTYPE[!Index], function(x){
+ y <- StormTYPES[ which.min( adist( x, StormTYPES, ignore.case = TRUE, partial = FALSE))]
+ as.character(y) 
+ })
+```
+
+### Cleansing variable that affect Storm impact on property costs and crop costs.
+
+* The data-set has information on the effect of various storm events on the impact on cost to both property and crops; this information is contained in PROPDMG and CROPDMG variables.  
+
+* The true cost is determined by applying a multiplication factor to each of these cost variables. These multiplication factors are contained in PROPDMGEXP and CROPDMGEXP variables.  
+
+* A new variable for both property and crops will be added to the data-set that contains the true cost of each storm event. 
+
+
+```r
+## Determine Cost of Prop Damage and Crop Damage
+Stormdata$PROPDMGEXP <- as.factor(Stormdata$PROPDMGEXP)
+levels(Stormdata$PROPDMGEXP) <- c("0","0","0","0", "2", "3", "4", "5", "6", "7", "9", "2", "2", "3", "6", "6")
+Stormdata$PROPDMGEXP  <- 10^(as.integer(Stormdata$PROPDMGEXP))
+Stormdata$PropTotal <- Stormdata$PROPDMG * Stormdata$PROPDMGEXP
+
+Stormdata$CROPDMGEXP <- as.factor(Stormdata$CROPDMGEXP)
+levels(Stormdata$CROPDMGEXP) <-c("0","0","0","9","3","3","6","6")
+Stormdata$CROPDMGEXP  <- 10^(as.integer(Stormdata$CROPDMGEXP))
+Stormdata$CROpTotal <- Stormdata$CROPDMG * Stormdata$CROPDMGEXP
+```
+
+# Results:  
+  
+#### 1. Storm events that are most harmful with respect to population health
+
+The Storm events that have the greatest impact on injury and fatalities will be investigated.
+
+
+
+```r
+library(ggplot2)
+library(reshape2)
+library(gridExtra)
+
+Harmfuldf <- melt(Stormdata,id.vars = c("EVTYPE","BGN_TIME"), measure.vars = c("FATALITIES","INJURIES"))
+
+InjFatTime <- aggregate(Harmfuldf$value,by=list(EventType =Harmfuldf$EVTYPE,Incident = Harmfuldf$variable ,Hour = Harmfuldf$BGN_TIME),FUN=sum)
+InjFat <- aggregate(Harmfuldf$value,by=list(EventType =Harmfuldf$EVTYPE,Incident = Harmfuldf$variable),FUN=sum)
+
+# Get top ten of each strom event
+InjFat1 <- subset(InjFat,Incident=="FATALITIES")
+InjFat1 <- InjFat1[ order(InjFat1$x,decreasing = TRUE),]
+
+InjFat2 <- subset(InjFat, Incident=="INJURIES")
+InjFat2 <- InjFat2[ order(InjFat2$x,decreasing = TRUE),]
+
+InjFat <- rbind(InjFat1[1:10,],InjFat2[1:10,])
+
+FatInj.plot <- ggplot(InjFat,aes(EventType,x,fill=Incident)) +
+  geom_bar(stat='identity') + 
+  labs(y="Occurances",x="Storm Event",title="Top 10 Storm Event impact on Fatalities and Injuries") +
+  theme_minimal() + scale_fill_brewer(palette="Dark2")+
+  theme(axis.text.x = element_text(angle = 45, size=8, hjust = 1, vjust = 1)) +
+  facet_wrap(~Incident ,scales = "free") +theme(legend.position="none")
+
+Time.plot <- ggplot(InjFatTime[InjFatTime$EventType=="TORNADO",],aes(Hour,x,color=Incident)) +
+  geom_line() + 
+  labs(y="Occurances",x="Time of Day",title="Tornado Begin times and impact on Fatalities and Injuries") +
+  theme_minimal() + scale_fill_brewer(palette="Dark2")+
+  facet_wrap(~Incident ,scales = "free") +theme(legend.position="none")
+
+grid.arrange(FatInj.plot, Time.plot, ncol = 2)
+```
+
+![](NOAA_Storm_files/figure-html/unnamed-chunk-4-1.png)
+  
+
+1. Tornados are the storm event that have the greatest impact on both fatalities and injuries. 
+
+2. Tornados deliver the greatest incident rates to both fatalities and injuries between the hours of 16:00 and 18:00. This may be due to a large number of people finishing work and travelling during these times. Investment in improved early warning systems may reduce these numbers significantly.  
+
+  
+  
+#### 2. Storm Events that are most costly on Economics
+
+The Storm events that have the greatest impact on costs both to property and crops will be investigated.  
+
+
+```r
+Economicsdf <- melt(Stormdata,id.vars = c("EVTYPE","BGN_TIME"), measure.vars = c("PropTotal","CROpTotal"))
+
+Economics <- aggregate(Economicsdf$value,by=list(EventType =Economicsdf$EVTYPE,CostImpact = Economicsdf$variable),FUN=sum)
+
+Economics1 <- subset(Economics,CostImpact=="PropTotal")
+Economics1 <- Economics1[ order(Economics1$x,decreasing = TRUE),]
+
+Economics2 <- subset(Economics, CostImpact=="CROpTotal")
+Economics2 <- Economics2[ order(Economics2$x,decreasing = TRUE),]
+
+Economics <- rbind(Economics1[1:10,],Economics2[1:10,])
+
+Eccom.plot <- ggplot(Economics,aes(EventType,x,fill=CostImpact)) +
+  geom_bar(stat='identity') + 
+  labs(y="Total Cost",x="Storm Event",title="Top 10 Storm Event Impact on Economic Costs") +
+  theme_minimal() + scale_fill_brewer(palette="Dark2")+
+  theme(axis.text.x = element_text(angle = 45, size=8, hjust = 1, vjust = 1)) +
+  facet_wrap(~CostImpact ,scales = "free") +theme(legend.position="none")
+
+Eccom.plot
+```
+
+![](NOAA_Storm_files/figure-html/unnamed-chunk-5-1.png)
+
+   
+1. Tornadoes are the single storm event that has the greatest impact on property costs. The impact on property from floods is greatest if these (Flood and Flash Flood) were combined.  
+
+2. Hail are the single storm event storm event that have the greatest impact on corps costs with the combination of  Flood and Flash Flood a close second.  
+
